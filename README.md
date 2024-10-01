@@ -1,0 +1,1 @@
+# az-nic-vm-info
