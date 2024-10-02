@@ -17,25 +17,27 @@ for nsg in $(echo "${nsg_info}" | jq -c '.[]'); do
     if [[ "$nic_list" != "null" && "$nic_list" != "[]" ]]; then
         for nic in $(echo "${nic_list}" | jq -r '.[] | @base64'); do
             _jq() {
-                echo "${nic}" | base64 --decode | jq -r "${1}" | tr -d '\n'
+                printf "%s" "${nic}" | base64 --decode | jq -r "${1}" | tr -d '\n'
             }
 
             nic_id=$(_jq '.id')
-            vm_id=$(az network nic show --ids "$nic_id" --query "virtualMachine.id" -o tsv)
+
+            # Suppress errors for the following commands
+            vm_id=$(az network nic show --ids "$nic_id" --query "virtualMachine.id" -o tsv 2>/dev/null)
 
             # Get VM name from the VM ID if it exists
             if [ -z "$vm_id" ]; then
                 vm_name="Not Assigned"
             else
-                vm_name=$(az vm show --ids "$vm_id" --query "name" -o tsv)
+                vm_name=$(az vm show --ids "$vm_id" --query "name" -o tsv 2>/dev/null)
             fi
 
             # Fetch the public IP associated with the NIC, if available
-            public_ip_id=$(az network nic show --ids "$nic_id" --query "ipConfigurations[0].publicIPAddress.id" -o tsv)
+            public_ip_id=$(az network nic show --ids "$nic_id" --query "ipConfigurations[0].publicIPAddress.id" -o tsv 2>/dev/null)
             if [ -z "$public_ip_id" ]; then
                 public_ip="Not Assigned"
             else
-                public_ip=$(az network public-ip show --ids "$public_ip_id" --query "ipAddress" -o tsv)
+                public_ip=$(az network public-ip show --ids "$public_ip_id" --query "ipAddress" -o tsv 2>/dev/null)
             fi
 
             # Append the results to the output
