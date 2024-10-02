@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Fetch all NSG information with associated NICs and VMs
+# Fetch all NSG information with associated NICs
 nsg_info=$(az network nsg list --query "[].{NSGName:name, ResourceGroup:resourceGroup, NICs:networkInterfaces}" -o json)
 
 # Prepare header
@@ -22,30 +22,26 @@ for nsg in $(echo "${nsg_info}" | jq -c '.[]'); do
 
             nic_id=$(_jq '.id')
 
-            # Suppress errors for the following commands
+            # Check if the NIC is attached to a VM
             vm_id=$(az network nic show --ids "$nic_id" --query "virtualMachine.id" -o tsv 2>/dev/null)
 
-            # Get VM name from the VM ID if it exists
-            if [ -z "$vm_id" ]; then
-                vm_name="Not Assigned"
-            else
+            # Proceed only if NIC is attached to a VM
+            if [ -n "$vm_id" ]; then
+                # Get VM name from the VM ID
                 vm_name=$(az vm show --ids "$vm_id" --query "name" -o tsv 2>/dev/null)
-            fi
 
-            # Fetch the public IP associated with the NIC, if available
-            public_ip_id=$(az network nic show --ids "$nic_id" --query "ipConfigurations[0].publicIPAddress.id" -o tsv 2>/dev/null)
-            if [ -z "$public_ip_id" ]; then
-                public_ip="Not Assigned"
-            else
-                public_ip=$(az network public-ip show --ids "$public_ip_id" --query "ipAddress" -o tsv 2>/dev/null)
-            fi
+                # Fetch the public IP associated with the NIC, if available
+                public_ip_id=$(az network nic show --ids "$nic_id" --query "ipConfigurations[0].publicIPAddress.id" -o tsv 2>/dev/null)
+                if [ -z "$public_ip_id" ]; then
+                    public_ip="Not Assigned"
+                else
+                    public_ip=$(az network public-ip show --ids "$public_ip_id" --query "ipAddress" -o tsv 2>/dev/null)
+                fi
 
-            # Append the results to the output
-            output+="${resource_group}\t${vm_name}\t${nsg_name}\t${public_ip}\n"
+                # Append the results to the output
+                output+="${resource_group}\t${vm_name}\t${nsg_name}\t${public_ip}\n"
+            fi
         done
-    else
-        # If NSG is not associated with any NICs, no VM or public IP is available
-        output+="${resource_group}\tNo VM Associated\t${nsg_name}\tNo Public IP\n"
     fi
 done
 
